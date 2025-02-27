@@ -1,3 +1,1 @@
-dataset/faces/*
-dataset/test_faces/*
-dataset/original_images/*
+dataset/*
