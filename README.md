@@ -41,3 +41,26 @@ conda install -c conda-forge cudatoolkit=11.8 cudnn=8.9
 ```bash
 conda install pytorch torchvision torchaudio -c pytorch
 ```
+
+```bash
+conda install fastapi uvicorn
+```
+
+```bash
+pip install python-multipart
+```
+
+# Test the API
+```bash
+curl -X POST "http://127.0.0.1:8000/ai/match?threshold=0.65" \
+  -H "accept: application/json" \
+  -H "Content-Type: multipart/form-data" \
+  -F "file=@face5.jpg"
+
+curl -X POST "http://127.0.0.1:8000/ai/brains" \
+  -H "accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d "{\"user_id\": \"user1\", \"brain_id\": \"brain1\"}"
+```
+
+
