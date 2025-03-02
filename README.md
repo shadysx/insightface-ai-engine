@@ -52,15 +52,29 @@ pip install python-multipart
 
 # Test the API
 ```bash
+# Match a face in the default brain
 curl -X POST "http://127.0.0.1:8000/ai/match?threshold=0.65" \
   -H "accept: application/json" \
   -H "Content-Type: multipart/form-data" \
   -F "file=@face5.jpg"
 
+# Create a new brain
 curl -X POST "http://127.0.0.1:8000/ai/brains" \
   -H "accept: application/json" \
   -H "Content-Type: application/json" \
   -d "{\"user_id\": \"user1\", \"brain_id\": \"brain1\"}"
+
+# Delete a brain
+curl -X DELETE "http://127.0.0.1:8000/ai/brains" \
+  -H "accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d "{\"user_id\": \"user1\", \"brain_id\": \"brain1\"}"
+
+# Upload files to a brain
+curl -X POST "http://127.0.0.1:8000/ai/users/Q0OHvIjD4MA8qOkNR6kSthAcoKoBtmS6/brains/cm7qxtuc10005jxdscc6wxopz/upload" \
+  -F "files=@face1.jpg" \
+  -F "files=@face2.jpg" \
+  -F "files=@face3.png"
 ```
 
 

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile
+from fastapi import FastAPI, UploadFile, File
 import cv2
 import torch
 import insightface
@@ -8,6 +8,10 @@ import os
 import faiss
 import pickle
 import shutil
+from typing import Optional, List
+from fastapi import Header
+from fastapi.responses import JSONResponse
+
 app = FastAPI()
 
 def create_brain_structure(user_id: str, brain_id: str):
@@ -44,12 +48,7 @@ def create_brain_structure(user_id: str, brain_id: str):
             "message": "Brain directory structure created successfully",
         }
     except Exception as e:
-        print(f"Error creating brain directory structure: {str(e)}")
-        return {
-            "status": "error",
-            "message": f"Error creating brain directory structure: {str(e)}",
-            "error": str(e)
-        }
+        raise Exception(f"Error creating brain directory structure: {str(e)}")
 
 def delete_brain_structure(user_id: str, brain_id: str):
     try:
@@ -63,12 +62,7 @@ def delete_brain_structure(user_id: str, brain_id: str):
             print(f"Brain directory deleted: {brain_path}")
             return {"status": "success", "message": "Brain deleted successfully"}
     except Exception as e:
-        print(f"Error deleting brain directory structure: {str(e)}")
-        return {
-            "status": "error",
-            "message": f"Error deleting brain directory structure: {str(e)}",
-            "error": str(e)
-        }
+        raise Exception(f"Error deleting brain directory structure: {str(e)}")
 
 async def get_best_match_from_upload(upload_file, threshold = 0.65):
     face_recognition = FaceRecognition(threshold)
@@ -234,6 +228,35 @@ async def create_brain(user_id: str, brain_id: str):
 @app.delete("/ai/brains/")
 async def delete_brain(user_id: str, brain_id: str):
     return delete_brain_structure(user_id, brain_id)
+
+
+@app.post("/ai/users/{user_id}/brains/{brain_id}/upload")
+async def upload_files(
+    user_id: str,
+    brain_id: str,
+    files: List[UploadFile] = File(...)
+):
+    try:
+        results = []
+        for file in files:
+            file_path = f"brain-containers/{user_id}/{brain_id}/{file.filename}"
+            
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            
+            content = await file.read()
+            with open(file_path, "wb") as buffer:
+                buffer.write(content)
+                
+            results.append({
+                "filename": file.filename,
+                "path": file_path
+            })
+            
+        return {
+            "status": "success", 
+        }
+    except Exception as e:
+        raise Exception(f"Error uploading files: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
