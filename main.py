@@ -64,6 +64,30 @@ def delete_brain_structure(user_id: str, brain_id: str):
     except Exception as e:
         raise Exception(f"Error deleting brain directory structure: {str(e)}")
 
+async def upload_files_to_brain(user_id: str, brain_id: str, files: List[UploadFile]):
+    try:
+        results = []
+        for file in files:
+            file_path = f"brain-containers/{user_id}/{brain_id}/{file.filename}"
+        
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        
+        content = await file.read()
+        with open(file_path, "wb") as buffer:
+            buffer.write(content)
+            
+        results.append({
+            "filename": file.filename,
+            "path": file_path
+        })
+        
+        return {
+            "status": "success", 
+        }
+    except Exception as e:
+        raise Exception(f"Error uploading files: {str(e)}")
+
+
 async def get_best_match_from_upload(upload_file, threshold = 0.65):
     face_recognition = FaceRecognition(threshold)
     face_recognition.initialize_model()
@@ -230,33 +254,13 @@ async def delete_brain(user_id: str, brain_id: str):
     return delete_brain_structure(user_id, brain_id)
 
 
-@app.post("/ai/users/{user_id}/brains/{brain_id}/upload")
+@app.post("/ai/users/{user_id}/brains/{brain_id}/files")
 async def upload_files(
     user_id: str,
     brain_id: str,
     files: List[UploadFile] = File(...)
 ):
-    try:
-        results = []
-        for file in files:
-            file_path = f"brain-containers/{user_id}/{brain_id}/{file.filename}"
-            
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            
-            content = await file.read()
-            with open(file_path, "wb") as buffer:
-                buffer.write(content)
-                
-            results.append({
-                "filename": file.filename,
-                "path": file_path
-            })
-            
-        return {
-            "status": "success", 
-        }
-    except Exception as e:
-        raise Exception(f"Error uploading files: {str(e)}")
+    return await upload_files_to_brain(user_id, brain_id, files)
 
 if __name__ == "__main__":
     import uvicorn
