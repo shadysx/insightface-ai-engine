@@ -7,10 +7,10 @@ from insightface.app import FaceAnalysis
 import os
 import faiss
 import pickle
-
+import shutil
 app = FastAPI()
 
-def create_brain(user_id: str, brain_id: str):
+def create_brain_structure(user_id: str, brain_id: str):
     try:
         print(f"Creating brain for user: {user_id} and brain: {brain_id}")
         base_path = "brain-containers"
@@ -48,6 +48,25 @@ def create_brain(user_id: str, brain_id: str):
         return {
             "status": "error",
             "message": f"Error creating brain directory structure: {str(e)}",
+            "error": str(e)
+        }
+
+def delete_brain_structure(user_id: str, brain_id: str):
+    try:
+        print(f"Deleting brain: {brain_id}")
+        base_path = "brain-containers"
+        user_path = os.path.join(base_path, user_id)
+        brain_path = os.path.join(user_path, brain_id)
+        
+        if os.path.exists(brain_path):
+            shutil.rmtree(brain_path)
+            print(f"Brain directory deleted: {brain_path}")
+            return {"status": "success", "message": "Brain deleted successfully"}
+    except Exception as e:
+        print(f"Error deleting brain directory structure: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"Error deleting brain directory structure: {str(e)}",
             "error": str(e)
         }
 
@@ -208,9 +227,13 @@ async def get_best_match(file: UploadFile, threshold: float = 0.65):
     best_match, best_similarity = await get_best_match_from_upload(file, threshold)
     return {"match": best_match, "similarity": best_similarity}
 
-@app.post("/ai/brains")
+@app.post("/ai/brains/")
 async def create_brain(user_id: str, brain_id: str):
-    return await create_brain(user_id, brain_id)
+    return create_brain_structure(user_id, brain_id)
+
+@app.delete("/ai/brains/")
+async def delete_brain(user_id: str, brain_id: str):
+    return delete_brain_structure(user_id, brain_id)
 
 if __name__ == "__main__":
     import uvicorn
