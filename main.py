@@ -68,21 +68,23 @@ async def upload_files_to_brain(user_id: str, brain_id: str, files: List[UploadF
     try:
         results = []
         for file in files:
+            print(f"Uploading file: {file.filename}")
             file_path = f"brain-containers/{user_id}/{brain_id}/{file.filename}"
-        
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        
-        content = await file.read()
-        with open(file_path, "wb") as buffer:
-            buffer.write(content)
             
-        results.append({
-            "filename": file.filename,
-            "path": file_path
-        })
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            
+            content = await file.read()
+            with open(file_path, "wb") as buffer:
+                buffer.write(content)
+                
+            results.append({
+                "filename": file.filename,
+                "path": file_path
+            })
         
         return {
-            "status": "success", 
+            "status": "success",
+            "files": results
         }
     except Exception as e:
         raise Exception(f"Error uploading files: {str(e)}")
