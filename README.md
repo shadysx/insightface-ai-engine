@@ -75,6 +75,10 @@ curl -X POST "http://127.0.0.1:8000/ai/users/Q0OHvIjD4MA8qOkNR6kSthAcoKoBtmS6/br
   -F "files=@face1.jpg" \
   -F "files=@face2.jpg" \
   -F "files=@face3.png"
+
+# Get a file from a brain
+curl "http://127.0.0.1:8000/ai/users/Q0OHvIjD4MA8qOkNR6kSthAcoKoBtmS6/brains/cm7rgyiq00001jxaso5pw4nn3/files/face1.jpg" \
+  --output test_image.jpg
 ```
 
 

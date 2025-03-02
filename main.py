@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, BackgroundTasks
 import cv2
 import torch
 import insightface
@@ -10,9 +10,16 @@ import pickle
 import shutil
 from typing import Optional, List
 from fastapi import Header
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi import HTTPException
+from enum import IntEnum
 
 app = FastAPI()
+
+class BrainStatus(IntEnum):
+    UNTRAINED = 0
+    TRAINING = 1
+    READY = 2
 
 def create_brain_structure(user_id: str, brain_id: str):
     try:
@@ -67,11 +74,12 @@ def delete_brain_structure(user_id: str, brain_id: str):
 async def upload_files_to_brain(user_id: str, brain_id: str, files: List[UploadFile]):
     try:
         results = []
+        dataset_path = f"brain-containers/{user_id}/{brain_id}/dataset"
+        os.makedirs(dataset_path, exist_ok=True)
+        
         for file in files:
             print(f"Uploading file: {file.filename}")
-            file_path = f"brain-containers/{user_id}/{brain_id}/{file.filename}"
-            
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            file_path = os.path.join(dataset_path, file.filename)
             
             content = await file.read()
             with open(file_path, "wb") as buffer:
@@ -89,6 +97,57 @@ async def upload_files_to_brain(user_id: str, brain_id: str, files: List[UploadF
     except Exception as e:
         raise Exception(f"Error uploading files: {str(e)}")
 
+async def get_files_info_from_brain(user_id: str, brain_id: str):
+    try:
+        brain_path = f"brain-containers/{user_id}/{brain_id}/dataset"
+        
+        if not os.path.exists(brain_path):
+            raise Exception("Brain not found")
+
+        files = []
+        for root, _, filenames in os.walk(brain_path):
+            for filename in filenames:
+                if not filename.startswith('.'):
+                    relative_path = os.path.relpath(os.path.join(root, filename), brain_path)
+                    files.append({
+                        "name": filename,
+                        "path": relative_path,
+                        "size": os.path.getsize(os.path.join(root, filename))
+                    })
+
+        return {
+            "status": "success",
+            "files": files,
+            "total": len(files),
+            "total_size": sum(file["size"] for file in files)
+        }
+        
+    except Exception as e:
+        raise Exception(f"Error getting brain files: {str(e)}")
+
+async def get_file_from_brain(user_id: str, brain_id: str, filename: str):
+    try:
+        file_path = f"brain-containers/{user_id}/{brain_id}/dataset/{filename}"
+        
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="File not found")
+            
+        return FileResponse(
+            file_path,
+            media_type="image/jpeg", 
+            filename=filename
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+def train_brain(user_id: str, brain_id: str):
+    index_file = f"brain-containers/{user_id}/{brain_id}/index/face_index.faiss"
+    path_file = f"brain-containers/{user_id}/{brain_id}/index/file_paths.pkl"
+    dataset_image_path = f"brain-containers/{user_id}/{brain_id}/dataset"
+    face_recognition = FaceRecognition(index_file=index_file, path_file=path_file, dataset_image_path=dataset_image_path)
+    face_recognition.initialize_model()
+    face_recognition.build_index()
 
 async def get_best_match_from_upload(upload_file, threshold = 0.65):
     face_recognition = FaceRecognition(threshold)
@@ -107,14 +166,16 @@ def get_best_match_from_path(image_path, threshold = 0.65):
     best_match, best_similarity = face_recognition.search_faces(test_embedding)
     return best_match, best_similarity
 
+
+
 class FaceRecognition:
-    def __init__(self, threshold=0.65):
+    def __init__(self, threshold=0.65, index_file="index/face_index.faiss", path_file="index/file_paths.pkl", dataset_image_path="dataset/original_images"):
         self.app = None
         self.index = None
         self.threshold  = threshold
-        self.index_file = "index/face_index.faiss"
-        self.paths_file = "index/file_paths.pkl"
-        self.dataset_image_path = "dataset/original_images"
+        self.index_file = index_file
+        self.paths_file = path_file
+        self.dataset_image_path = dataset_image_path
 
     def check_gpu_support(self):
         """Vérifie la disponibilité du support GPU"""
@@ -200,6 +261,10 @@ class FaceRecognition:
                     except Exception as e:
                         print(f"Skipping {image_path}: {str(e)}")
         
+        # If no embeddings are found, raise an error
+        if not embeddings:
+            raise ValueError("No valid face embeddings found in the dataset")
+            
         # Convert embeddings to numpy array
         embeddings = np.array(embeddings).astype('float32')
         
@@ -235,13 +300,21 @@ class FaceRecognition:
             with open(self.paths_file, 'rb') as f:
                 self.file_paths = pickle.load(f)
         else:
-            print("Building new index...")
-            index, file_paths = self.build_face_database()
-            # Save index and paths for future use
-            faiss.write_index(index, self.index_file)
-            with open(self.paths_file, 'wb') as f:
-                pickle.dump(file_paths, f)
+            self.build_index()
 
+
+    def build_index(self):
+        print("Building new index...")
+        index, file_paths = self.build_face_database()
+        # Save index and paths for future use
+        faiss.write_index(index, self.index_file)
+        with open(self.paths_file, 'wb') as f:
+            pickle.dump(file_paths, f)
+    
+# Current training locks
+training_locks = {}
+
+# TODO: This endpoint is not used anymore
 @app.post("/ai/matchs")
 async def get_best_match(file: UploadFile, threshold: float = 0.65):
     best_match, best_similarity = await get_best_match_from_upload(file, threshold)
@@ -257,12 +330,75 @@ async def delete_brain(user_id: str, brain_id: str):
 
 
 @app.post("/ai/users/{user_id}/brains/{brain_id}/files")
-async def upload_files(
+async def upload_brain_files(
     user_id: str,
     brain_id: str,
     files: List[UploadFile] = File(...)
 ):
     return await upload_files_to_brain(user_id, brain_id, files)
+
+@app.get("/ai/users/{user_id}/brains/{brain_id}/files")
+async def get_brain_files_info(user_id: str, brain_id: str):
+    return await get_files_info_from_brain(user_id, brain_id)
+
+@app.get("/ai/users/{user_id}/brains/{brain_id}/files/{filename}")
+async def get_brain_file(user_id: str, brain_id: str, filename: str):
+    return await get_file_from_brain(user_id, brain_id, filename)
+
+@app.post("/ai/users/{user_id}/brains/{brain_id}/train")
+async def train(user_id: str, brain_id: str, background_tasks: BackgroundTasks):
+    brain_key = f"{user_id}_{brain_id}"
+    
+    if brain_key in training_locks:
+        raise HTTPException(
+            status_code=409,
+            detail="Training already in progress for this brain"
+        )
+    
+    training_locks[brain_key] = True
+    
+    def train_with_cleanup():
+        try:
+            train_brain(user_id, brain_id)
+        finally:
+            if brain_key in training_locks:
+                del training_locks[brain_key]
+    
+    background_tasks.add_task(train_with_cleanup)
+    
+    return {
+        "status": "accepted",
+        "message": "Training started in background",
+        "brain_id": brain_id
+    }
+
+@app.get("/ai/users/{user_id}/brains/{brain_id}/status")
+async def get_training_status(user_id: str, brain_id: str):
+    brain_key = f"{user_id}_{brain_id}"
+    
+    # Check if the brain exists
+    brain_path = f"brain-containers/{user_id}/{brain_id}"
+    if not os.path.exists(brain_path):
+        raise HTTPException(
+            status_code=404,
+            detail="Brain not found"
+        )
+    
+    # Check if the index exists
+    index_path = f"{brain_path}/index/face_index.faiss"
+    has_index = os.path.exists(index_path)
+    
+    # Determine the status
+    if brain_key in training_locks:
+        status = BrainStatus.TRAINING
+    elif has_index:
+        status = BrainStatus.READY
+    else:
+        status = BrainStatus.UNTRAINED
+    
+    return {
+        "status": int(status)  
+    }
 
 if __name__ == "__main__":
     import uvicorn
