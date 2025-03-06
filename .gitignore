@@ -2,3 +2,4 @@ dataset/*
 brain-containers/*
 index/*
 __pycache__/v1.cpython-38.pyc
+test-files/*
