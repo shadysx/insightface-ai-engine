@@ -141,7 +141,7 @@ async def get_file_from_brain(user_id: str, brain_id: str, filename: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-def train_brain(user_id: str, brain_id: str):
+def train_brain(user_id, brain_id):
     index_file = f"brain-containers/{user_id}/{brain_id}/index/face_index.faiss"
     path_file = f"brain-containers/{user_id}/{brain_id}/index/file_paths.pkl"
     dataset_image_path = f"brain-containers/{user_id}/{brain_id}/dataset"
@@ -149,8 +149,11 @@ def train_brain(user_id: str, brain_id: str):
     face_recognition.initialize_model()
     face_recognition.build_index()
 
-async def get_best_match_from_upload(upload_file, threshold = 0.65):
-    face_recognition = FaceRecognition(threshold)
+async def get_best_match_from_upload(user_id, brain_id, upload_file, threshold = 0.65):
+    index_file = f"brain-containers/{user_id}/{brain_id}/index/face_index.faiss"
+    path_file = f"brain-containers/{user_id}/{brain_id}/index/file_paths.pkl"
+    dataset_image_path = f"brain-containers/{user_id}/{brain_id}/dataset"
+    face_recognition = FaceRecognition(index_file=index_file, path_file=path_file, dataset_image_path=dataset_image_path, threshold=threshold)
     face_recognition.initialize_model()
     face_recognition.load_index()
     img_rgb = await face_recognition.convert_upload_to_img_rgb(upload_file)
@@ -314,10 +317,14 @@ class FaceRecognition:
 # Current training locks
 training_locks = {}
 
-# TODO: This endpoint is not used anymore
-@app.post("/ai/matchs")
-async def get_best_match(file: UploadFile, threshold: float = 0.65):
-    best_match, best_similarity = await get_best_match_from_upload(file, threshold)
+@app.post("/ai/users/{user_id}/brains/{brain_id}/match")
+async def get_best_match(
+    user_id: str,
+    brain_id: str,
+    file: UploadFile,
+    threshold: float = 0.65
+):
+    best_match, best_similarity = await get_best_match_from_upload(user_id, brain_id, file, threshold)
     return {"match": best_match, "similarity": best_similarity}
 
 @app.post("/ai/brains/")
@@ -355,6 +362,7 @@ async def train(user_id: str, brain_id: str, background_tasks: BackgroundTasks):
             detail="Training already in progress for this brain"
         )
     
+    # Check if the brain is already in training
     training_locks[brain_key] = True
     
     def train_with_cleanup():
