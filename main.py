@@ -13,6 +13,9 @@ from fastapi import Header
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi import HTTPException
 from enum import IntEnum
+import os
+# TODO: Handle multiples instances with queues
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 app = FastAPI()
 
@@ -159,6 +162,7 @@ async def get_best_match_from_upload(user_id, brain_id, upload_file, threshold =
     img_rgb = await face_recognition.convert_upload_to_img_rgb(upload_file)
     test_embedding = await face_recognition.get_face_embedding_from_img_rgb(img_rgb)
     best_match, best_similarity = face_recognition.search_faces(test_embedding)
+    print(f"Best match: {best_match}, Best similarity: {best_similarity}")
     return best_match, best_similarity
 
 def get_best_match_from_path(image_path, threshold = 0.65):
@@ -181,7 +185,7 @@ class FaceRecognition:
         self.dataset_image_path = dataset_image_path
 
     def check_gpu_support(self):
-        """Vérifie la disponibilité du support GPU"""
+        """check if the GPU is supported by the model"""
         try:
             # Check PyTorch CUDA support
             torch_cuda_available = torch.cuda.is_available()
