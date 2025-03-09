@@ -1,6 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, BackgroundTasks
 import cv2
-import torch
 import insightface
 import numpy as np
 from insightface.app import FaceAnalysis
@@ -14,7 +13,9 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi import HTTPException
 from enum import IntEnum
 import os
+
 # TODO: Handle multiples instances with queues
+# This error happen when OpenMP has multiple instances and is solved by this environment variable
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 app = FastAPI()
@@ -173,8 +174,6 @@ def get_best_match_from_path(image_path, threshold = 0.65):
     best_match, best_similarity = face_recognition.search_faces(test_embedding)
     return best_match, best_similarity
 
-
-
 class FaceRecognition:
     def __init__(self, threshold=0.65, index_file="index/face_index.faiss", path_file="index/file_paths.pkl", dataset_image_path="dataset/original_images"):
         self.app = None
@@ -188,11 +187,11 @@ class FaceRecognition:
         """check if the GPU is supported by the model"""
         try:
             # Check PyTorch CUDA support
-            torch_cuda_available = torch.cuda.is_available()
-            print(f"\nPyTorch CUDA support: {'Available' if torch_cuda_available else 'Not available'}")
-            if torch_cuda_available:
-                print(f"PyTorch CUDA version: {torch.version.cuda}")
-                print(f"GPU Device: {torch.cuda.get_device_name(0)}")
+            # torch_cuda_available = torch.cuda.is_available()
+            # print(f"\nPyTorch CUDA support: {'Available' if torch_cuda_available else 'Not available'}")
+            # if torch_cuda_available:
+            #     print(f"PyTorch CUDA version: {torch.version.cuda}")
+            #     print(f"GPU Device: {torch.cuda.get_device_name(0)}")
             
             # Check FAISS GPU support
             faiss_gpu_available = hasattr(faiss, 'GpuIndexFlatIP')
