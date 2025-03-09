@@ -12,6 +12,8 @@ from fastapi import Header
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi import HTTPException
 from enum import IntEnum
+from deepface_engine.main import verify_faces
+# from deepface.deepface import hello_deepface, verify_faces
 import os
 
 # TODO: Handle multiples instances with queues
@@ -19,6 +21,9 @@ import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 app = FastAPI()
+# hello_deepface()
+verify_faces("test-images/brad-pitt-1.jpg", "test-images/brad-pitt-2.jpg")
+
 
 class BrainStatus(IntEnum):
     UNTRAINED = 0

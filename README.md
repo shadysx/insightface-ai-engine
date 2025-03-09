@@ -5,7 +5,7 @@
 1. Create a new conda environment:
 
 ```bash
-conda create -n insightface-ai-engine python=3.8
+conda create -n insightface-ai-engine python=3.11
 ```
 
 2. Activate the environment:
@@ -52,6 +52,12 @@ conda install fastapi uvicorn
 
 ```bash
 pip install python-multipart
+```
+
+# Pip one liner to install all the packages
+
+```bash
+pip install fastapi==0.112.2 uvicorn insightface onnxruntime faiss-cpu python-multipart deepface tf-keras
 ```
 
 # Test the API
